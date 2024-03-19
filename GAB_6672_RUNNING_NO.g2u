@@ -1,0 +1,118 @@
+﻿Program.Sub.ScreenSU.Start
+Gui.F_LastNo..Create(BaseForm)
+Gui.F_LastNo..Caption("Set The Last Number (6672)")
+Gui.F_LastNo..Size(340,137)
+Gui.F_LastNo..MinX(0)
+Gui.F_LastNo..MinY(0)
+Gui.F_LastNo..Position(0,0)
+Gui.F_LastNo..AlwaysOnTop(False)
+Gui.F_LastNo..FontName("Tahoma")
+Gui.F_LastNo..FontSize(8.25)
+Gui.F_LastNo..ControlBox(True)
+Gui.F_LastNo..MaxButton(True)
+Gui.F_LastNo..MinButton(True)
+Gui.F_LastNo..MousePointer(0)
+Gui.F_LastNo..Moveable(True)
+Gui.F_LastNo..Sizeable(True)
+Gui.F_LastNo..ShowInTaskBar(True)
+Gui.F_LastNo..TitleBar(True)
+Gui.F_LastNo..Event(Unload,Unload)
+Gui.F_LastNo.txtLastNo.Create(TextBox,"",True,206,20,0,10,35,True,0,"Tahoma",8.25,,1)
+Gui.F_LastNo.lbl1.Create(Label,"Last Number",True,60,13,0,14,9,True,0,"Tahoma",8.25,,0,0)
+Gui.F_LastNo.lbl1.BorderStyle(0)
+Gui.F_LastNo.cmdSave.Create(Button)
+Gui.F_LastNo.cmdSave.Enabled(True)
+Gui.F_LastNo.cmdSave.Visible(True)
+Gui.F_LastNo.cmdSave.Zorder(0)
+Gui.F_LastNo.cmdSave.Size(75,23)
+Gui.F_LastNo.cmdSave.Position(242,33)
+Gui.F_LastNo.cmdSave.Caption("SAVE")
+Gui.F_LastNo.cmdSave.FontName("Tahoma")
+Gui.F_LastNo.cmdSave.FontSize(8.25)
+Gui.F_LastNo.cmdSave.Event(Click,cmdSave_Click)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+V.Global.iReportID.Declare
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+
+V.Local.bExist.Declare
+V.Local.iNumber.Declare
+V.Local.sBIParam.Declare
+V.Local.sBIParamVal.Declare
+V.Local.sSql.Declare
+
+F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+F.ODBC.Connection!conx.TableExists("GAB_6672_RUNNING_NO",V.Local.bExist)
+F.Intrinsic.Control.If(V.Local.bExist,=,False)
+	F.ODBC.Connection!Conx.Execute("CREATE TABLE GAB_6672_RUNNING_NO(LAST_NO INTEGER);")
+	F.ODBC.Connection!conx.Execute("Insert Into GAB_6672_RUNNING_NO (LAST_NO) values (0)")
+F.Intrinsic.Control.EndIf
+
+f.Intrinsic.Control.If(v.Caller.Hook,=,42400)
+	F.ODBC.Connection!conx.OpenLocalRecordsetRW("rst","SELECT * FROM GAB_6672_RUNNING_NO")
+	
+	F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,False)
+		F.Intrinsic.Math.Add(V.ODBC.conx!rst.FieldVal!LAST_NO,1,V.Local.iNumber)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Math.Add(0,1,V.Local.iNumber)
+	F.Intrinsic.Control.EndIf
+	
+	F.ODBC.conx!rst.Set!LAST_NO(V.Local.iNumber)
+	F.ODBC.conx!rst.Update
+	F.ODBC.conx!rst.Close
+
+	F.Global.BI.GetIDFromName("AP_CHECK_REG_ENERTECH.RPT",V.Global.iReportID)
+	F.Intrinsic.Control.If(V.Global.iReportID,=,-1)
+		F.Intrinsic.UI.Msgbox("Custom AP Check Register report has not been setup. Please tell your administrator to setup the report.","NOTIFICATION")
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("Update BI_GLDTL SET Refn = {0} where TRMNL = '{1}' and RPTID = '000320' ",V.Local.iNumber, V.Caller.Terminal, V.Local.sSql)
+		F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+		F.Intrinsic.String.Split("Terminal*!*RptID","*!*",V.Local.sBIParam)
+		F.Intrinsic.String.Concat(V.Caller.Terminal,"*!*","000320",V.Local.sBIParamVal)
+		F.Intrinsic.String.Split(V.Local.sBIParamVal,"*!*",V.Local.sBIParamVal)
+		F.Global.BI.PrintReport(V.Global.iReportID,16,V.Local.sBIParam,V.Local.sBIParamVal,"GSView",True)
+	F.Intrinsic.Control.EndIf	
+	
+	F.Intrinsic.Control.CallSub(Unload)
+f.Intrinsic.Control.Else
+
+	F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst","SELECT * FROM GAB_6672_RUNNING_NO")
+	
+	F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,False)
+		Gui.F_LastNo.txtLastNo.Text(V.ODBC.conx!rst.FieldVal!LAST_NO)
+	F.Intrinsic.Control.Else
+		Gui.F_LastNo.txtLastNo.Text(0)
+	F.Intrinsic.Control.EndIf
+	
+	Gui.F_LastNo..Show
+	F.ODBC.conx!rst.Close
+f.Intrinsic.Control.EndIf
+
+Program.Sub.Main.End
+
+Program.Sub.Unload.Start
+F.ODBC.Connection!conx.Close
+F.Intrinsic.Control.End
+Program.Sub.Unload.End
+
+Program.Sub.cmdSave_Click.Start
+V.Local.sSql.Declare
+V.Local.iNumber.Declare
+
+V.Local.iNumber.Set(V.Screen.F_LastNo!txtLastNo.Text)
+F.Intrinsic.String.Build("Update GAB_6672_RUNNING_NO SET LAST_NO = {0}",V.Local.iNumber,V.Local.sSql)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+
+F.Intrinsic.UI.Msgbox("Saved!")
+
+Program.Sub.cmdSave_Click.End
+
+Program.Sub.Comments.Start
+${$5$}$3.0.0.0$}$1
+${$6$}$dyunus$}$20220322113204919$}$xZ6SHi8g7O0Qsxe6AiO2NH3PnOKQRy0TriCWpIzC+QET9MW9Zi5HaXlEgc14Lg8xSQdKze3FAt0=
+Program.Sub.Comments.End
